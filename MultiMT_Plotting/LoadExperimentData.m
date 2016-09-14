@@ -60,8 +60,8 @@ for n=1:max([data.Step])%numel(header.ExperimentScheme.ExperimentSteps):-1:1
     end
     
     if isfield(ExperimentData(n).StepData,'dZ')
-        ExperimentData(n).mean_dZ = nanmean([ExperimentData(n).StepData.Z_ABS],2);
-        ExperimentData(n).std_dZ = nanstd([ExperimentData(n).StepData.Z_ABS],0,2);
+        ExperimentData(n).mean_dZ = nanmean([ExperimentData(n).StepData.dZ],2);
+        ExperimentData(n).std_dZ = nanstd([ExperimentData(n).StepData.dZ],0,2);
     else
         if isfield(ExperimentData(n).StepData,'Z_REL') && isfield(ExperimentData(n).StepData,'Z_ABS')
             for t=1:numel(ExperimentData(n).StepData)
