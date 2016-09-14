@@ -1,4 +1,10 @@
 function [hLines,hAx,hPnl,hFig] = plot_selectable(X,Y,DataSetNames,hFig,colors)
+% Plot multiple datasets in a selectable gui
+%   X = matrix specifying X data. columns are separate datasets
+%   Y = matrix of Y Data, same size as X
+%   DataSetNames = cell array containgin names for each column
+%   color = rgb colors to use for lines (nDataPts x 3)
+
 
 %% Validate data
 if any(size(X)~=size(Y))

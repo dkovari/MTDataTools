@@ -1,4 +1,13 @@
 function PlotChapeauCurve(varargin)
+%Plot Chapeau Curve using data in mtdat file
+% Input:
+%   PlotChapeauCurve(header,ExperimentData)
+%       plot data in specified data structures (header,ExpData are produced
+%       by LoadExperimentData()
+%   PlotChapeauCurve('path to your mtdat file')
+%       load data from file and plot
+%   PlotChapeauCurve()
+%       prompt user to select file with uigetfile()
 
 %% Load Data
 if nargin>1

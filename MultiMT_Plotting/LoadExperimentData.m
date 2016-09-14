@@ -1,4 +1,9 @@
 function [header,ExperimentData,filepath] = LoadExperimentData(filepath)
+% Load MultiMT experiment data
+%   Will load data from any MultiMT experiment as long as it was saved in
+%   the mtdat format (won't work with pre Sept-2016 software)
+% filename = path to file (optional, if not included uigetfile will be
+% called)
 
 persistent lastdir;
 if nargin< 1

@@ -1,4 +1,13 @@
 function PlotForceExtension(varargin)
+%Plot Force Extension results from mtdat file
+% Input:
+%   PlotForceExtension(header,ExperimentData)
+%       plot data in specified data structures header,ExpData are produced
+%       by LoadExperimentData()
+%   PlotForceExtension('path to your mtdat file')
+%       load data from file and plot
+%   PlotForceExtension()
+%       prompt user to select file with uigetfile()
 
 if nargin>1
     header = varargin{1};
