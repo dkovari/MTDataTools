@@ -396,22 +396,6 @@ classdef errorbar2 < matlab.mixin.SetGet
                 if any(size(this.YData)~=size(this.XData))
                     return;
                 end
-%                 this.XDataAuto = false;
-%                 this.YDataAuto = false;
-%                 set(this.DataLineHandle,'XData',this.XData,'YData',this.YData);
-%             elseif isempty(this.YData) && ~isempty(this.XData)
-%                 this.XDataAuto = false;
-%                 this.YDataAuto = true;
-%                 
-%                 this.YData = 1:numel(this.XData);
-%                 this.YData = reshape(this.YData,size(this.XData));
-%                 set(this.DataLineHandle,'XData',this.XData,'YData',this.YData);
-%             elseif ~isempty(this.YData) && isempty(this.XData)
-%                 this.XDataAuto = true;
-%                 this.YDataAuto = false;
-%                 
-%                 this.XData = 1:numel(this.YData);
-%                 this.XData = reshape(this.XData,size(this.YData));
                 set(this.DataLineHandle,'XData',this.XData,'YData',this.YData);
             else %both empty
                 %delete all lines and return
@@ -435,40 +419,92 @@ classdef errorbar2 < matlab.mixin.SetGet
             this.DataLineHandle.MarkerSize = this.MarkerSize;
             this.DataLineHandle.MarkerEdgeColor = this.MarkerEdgeColor;
             this.DataLineHandle.MarkerFaceColor = this.MarkerFaceColor;
+            this.replotdataYLower;
+            this.replotdataYLower
             
-            %% X Whiskers
+            %% Whiskers and Bars
+            this.replotdataXLower;
+            this.replotdataXUpper;
+            this.replotdataYLower;
+            this.replotdataYUpper;
+            
+            %%reset children and reorder plots
+            this.resetChildren;
+        end
+        function replotdataXYonly(this)
+            if ~this.initialized
+                return;
+            end
+            %% make sure axes exists
+            if isempty(this.Parent)||~ishghandle(this.Parent)
+                return;
+            end
+            %% create data line if needed
+            if isempty(this.DataLineHandle)||~ishghandle(this.DataLineHandle)
+                this.replotdata;
+                return;
+            end
+            %% make/set dataline data
+            if any(size(this.YData)~=size(this.XData))
+                return;
+            end
+            if ~isempty(this.YData) && ~isempty(this.XData) 
+                set(this.DataLineHandle,'XData',this.XData,'YData',this.YData);
+            else %both empty
+                %delete all lines and return
+%                warning('setting both XData and YData to empty deletes all graphics elements created by errorbar2');
+                delete(this.Children);
+                this.Children = [];
+                this.DataLineHandle = [];
+                this.XWhiskerLineHandles =[];
+                this.YWhiskerLineHandles = [];
+                this.XLowerBarHandles = [];
+                this.XUpperBarHandles = [];
+                this.YLowerBarHandles = [];
+                this.YUpperBarHandles = [];
+                return;
+            end
+        end
+        function replotdataXLower(this)
+            if any(size(this.YData)~=size(this.XData))
+                return;
+            end
             %% XLower
             if isempty(this.XLowerLineHandles)||~any(ishghandle(this.XLowerLineHandles))
                 try
                     delete(this.XLowerLineHandles);
                 catch
                 end
-                for n=1:numel(this.XData)
-                    this.XLowerLineHandles(n) = line(this.Parent,NaN,NaN);
-                end
+                this.XLowerLineHandles = [];
             end
             if numel(this.XLowerLineHandles)<numel(this.XData)
+                whiskcolor = this.XWhiskerColor;
+                if strcmpi(whiskcolor,'auto')
+                    whiskcolor = this.Color;
+                end
                 for n=numel(this.XLowerLineHandles)+1:numel(this.XData)
                     this.XLowerLineHandles(n) = line(this.Parent,NaN,NaN);
+                    set(this.XLowerLineHandles(n),...
+                        'LineStyle',this.XWhiskerLineStyle,...
+                        'LineWidth',this.XWhiskerLineWidth,...
+                        'Color',whiskcolor,...
+                        'Marker',this.XWhiskerMarker,...
+                        'MarkerSize',this.XWhiskerMarkerSize,...
+                        'MarkerEdgeColor',this.XWhiskerMarkerEdgeColor,...
+                        'MarkerFaceColor',this.XWhiskerMarkerFaceColor);
                 end
             end
-            if numel(this.XLowerLineHandles)<numel(this.XData)
-                for n=numel(this.XData)+1:numel(this.XLowerLineHandles)
-                    delete(this.XLowerLineHandles(n));
-                end
+            if numel(this.XLowerLineHandles)>numel(this.XData)
+                delete(this.XLowerLineHandles(numel(this.XData)+1:end));
                 this.XLowerLineHandles(numel(this.XData)+1:end) = [];
             end
             %set data for x whiskers
             if ~isempty(this.XLowerData)
-                if numel(this.XLowerData)~=numel(this.XData)
-                    %warning('number or low points does not match number of datapoints');
-                    if numel(this.XLowerData)<numel(this.XData)
-                        this.XLowerData(end+1:numel(this.XData)) = NaN;
-                    end
+                if numel(this.XLowerData)<numel(this.XData)
+                    this.XLowerData(end+1:numel(this.XData)) = NaN;
                 end
-
                 %set whisker data
-                for n=1:numel(this.XData)
+                for n=1:min(numel(this.XData),numel(this.YData))
                     set(this.XLowerLineHandles(n),...
                         'XData',this.XData(n)+[-this.XLowerData(n),0],...
                         'YData',[this.YData(n),this.YData(n)]);
@@ -478,268 +514,21 @@ classdef errorbar2 < matlab.mixin.SetGet
                     set(this.XLowerLineHandles(n),'XData',NaN,'YData',NaN);
                 end
             end
-            %Set x whisker line style
-            whiskcolor = this.XWhiskerColor;
-            if strcmpi(whiskcolor,'auto')
-                whiskcolor = this.Color;
-            end
-            for n=1:numel(this.XLowerLineHandles)
-                set(this.XLowerLineHandles(n),...
-                    'LineStyle',this.XWhiskerLineStyle,...
-                    'LineWidth',this.XWhiskerLineWidth,...
-                    'Color',whiskcolor,...
-                    'Marker',this.XWhiskerMarker,...
-                    'MarkerSize',this.XWhiskerMarkerSize,...
-                    'MarkerEdgeColor',this.XWhiskerMarkerEdgeColor,...
-                    'MarkerFaceColor',this.XWhiskerMarkerFaceColor);
-            end
-            %% XUpper
-            if isempty(this.XUpperLineHandles)||~any(ishghandle(this.XUpperLineHandles))
+            %% X Bar Low
+            if isempty(this.XLowerBarHandles)||~any(ishghandle(this.XLowerBarHandles))
                 try
-                    delete(this.XUpperLineHandles);
+                    delete(this.XLowerBarHandles);
                 catch
                 end
-                for n=1:numel(this.XData)
-                    this.XUpperLineHandles(n) = line(this.Parent,NaN,NaN);
-                end
+                this.XLowerBarHandles = [];
             end
-            if numel(this.XUpperLineHandles)<numel(this.XData)
-                for n=numel(this.XUpperLineHandles)+1:numel(this.XData)
-                    this.XUpperLineHandles(n) = line(this.Parent,NaN,NaN);
-                end
-            end
-            if numel(this.XUpperLineHandles)<numel(this.XData)
-                for n=numel(this.XData)+1:numel(this.XUpperLineHandles)
-                    delete(this.XUpperLineHandles(n));
-                end
-                this.XUpperLineHandles(numel(this.XData)+1:end) = [];
-            end
-            %set data for x whiskers
-            if ~isempty(this.XUpperData)
-                if numel(this.XUpperData)~=numel(this.XData)
-                    %warning('number or low points does not match number of datapoints');
-                    if numel(this.XUpperData)<numel(this.XData)
-                        this.XUpperData(end+1:numel(this.XData)) = NaN;
-                    end
-                end
-
-                %set whisker data
-                for n=1:numel(this.XData)
-                    set(this.XUpperLineHandles(n),...
-                        'XData',this.XData(n)+[0,this.XUpperData(n)],...
-                        'YData',[this.YData(n),this.YData(n)]);
-                end
-            else %no x bounds, don't plot
-                for n=1:numel(this.XUpperLineHandles)
-                    set(this.XUpperLineHandles(n),'XData',NaN,'YData',NaN);
-                end
-            end
-            %Set x whisker line style
-            whiskcolor = this.XWhiskerColor;
-            if strcmpi(whiskcolor,'auto')
-                whiskcolor = this.Color;
-            end
-            for n=1:numel(this.XUpperLineHandles)
-                set(this.XUpperLineHandles(n),...
-                    'LineStyle',this.XWhiskerLineStyle,...
-                    'LineWidth',this.XWhiskerLineWidth,...
-                    'Color',whiskcolor,...
-                    'Marker',this.XWhiskerMarker,...
-                    'MarkerSize',this.XWhiskerMarkerSize,...
-                    'MarkerEdgeColor',this.XWhiskerMarkerEdgeColor,...
-                    'MarkerFaceColor',this.XWhiskerMarkerFaceColor);
-            end
-            %% YWhiskers
-            %% YLower
-            if isempty(this.YLowerLineHandles)||~any(ishghandle(this.YLowerLineHandles))
-                try
-                    delete(this.YLowerLineHandles);
-                catch
-                end
-                for n=1:numel(this.YData)
-                    this.YLowerLineHandles(n) = line(this.Parent,NaN,NaN);
-                end
-            end
-            if numel(this.YLowerLineHandles)<numel(this.YData)
-                for n=numel(this.YLowerLineHandles)+1:numel(this.YData)
-                    this.YLowerLineHandles(n) = line(this.Parent,NaN,NaN);
-                end
-            end
-            if numel(this.YLowerLineHandles)<numel(this.YData)
-                for n=numel(this.YData)+1:numel(this.YLowerLineHandles)
-                    delete(this.YLowerLineHandles(n));
-                end
-                this.YLowerLineHandles(numel(this.YData)+1:end) = [];
-            end
-            %set data for y whiskers
-            if ~isempty(this.YLowerData)
-                if numel(this.YLowerData)~=numel(this.YData)
-                    %warning('number or low points does not match number of datapoints');
-                    if numel(this.YLowerData)<numel(this.YData)
-                        this.YLowerData(end+1:numel(this.YData)) = NaN;
-                    end
-                end
-
-                %set whisker data
-                for n=1:numel(this.YData)
-                    set(this.YLowerLineHandles(n),...
-                        'YData',this.YData(n)+[-this.YLowerData(n),0],...
-                        'XData',[this.XData(n),this.XData(n)]);
-                end
-            else %no Y bounds, don't plot
-                for n=1:numel(this.YLowerLineHandles)
-                    set(this.YLowerLineHandles(n),'XData',NaN,'YData',NaN);
-                end
-            end
-            %Set x whisker line style
-            whiskcolor = this.YWhiskerColor;
-            if strcmpi(whiskcolor,'auto')
-                whiskcolor = this.Color;
-            end
-            for n=1:numel(this.YLowerLineHandles)
-                set(this.YLowerLineHandles(n),...
-                    'LineStyle',this.YWhiskerLineStyle,...
-                    'LineWidth',this.YWhiskerLineWidth,...
-                    'Color',whiskcolor,...
-                    'Marker',this.YWhiskerMarker,...
-                    'MarkerSize',this.YWhiskerMarkerSize,...
-                    'MarkerEdgeColor',this.YWhiskerMarkerEdgeColor,...
-                    'MarkerFaceColor',this.YWhiskerMarkerFaceColor);
-            end
-            %% XUpper
-            if isempty(this.YUpperLineHandles)||~any(ishghandle(this.YUpperLineHandles))
-                try
-                    delete(this.YUpperLineHandles);
-                catch
-                end
-                for n=1:numel(this.YData)
-                    this.YUpperLineHandles(n) = line(this.Parent,NaN,NaN);
-                end
-            end
-            if numel(this.YUpperLineHandles)<numel(this.YData)
-                for n=numel(this.YUpperLineHandles)+1:numel(this.YData)
-                    this.YUpperLineHandles(n) = line(this.Parent,NaN,NaN);
-                end
-            end
-            if numel(this.YUpperLineHandles)<numel(this.YData)
-                for n=numel(this.YData)+1:numel(this.YUpperLineHandles)
-                    delete(this.YUpperLineHandles(n));
-                end
-                this.YUpperLineHandles(numel(this.YData)+1:end) = [];
-            end
-            %set data for Y whiskers
-            if ~isempty(this.YUpperData)
-                if numel(this.YUpperData)~=numel(this.YData)
-                    %warning('number or low points does not match number of datapoints');
-                    if numel(this.YUpperData)<numel(this.YData)
-                        this.YUpperData(end+1:numel(this.YData)) = NaN;
-                    end
-                end
-
-                %set whisker data
-                for n=1:numel(this.YData)
-                    set(this.YUpperLineHandles(n),...
-                        'YData',this.YData(n)+[0,this.YUpperData(n)],...
-                        'XData',[this.XData(n),this.XData(n)]);
-                end
-            else %no Y bounds, don't plot
-                for n=1:numel(this.YUpperLineHandles)
-                    set(this.YUpperLineHandles(n),'XData',NaN,'YData',NaN);
-                end
-            end
-            %Set Y whisker line style
-            whiskcolor = this.YWhiskerColor;
-            if strcmpi(whiskcolor,'auto')
-                whiskcolor = this.Color;
-            end
-            for n=1:numel(this.YUpperLineHandles)
-                set(this.YUpperLineHandles(n),...
-                    'LineStyle',this.YWhiskerLineStyle,...
-                    'LineWidth',this.YWhiskerLineWidth,...
-                    'Color',whiskcolor,...
-                    'Marker',this.YWhiskerMarker,...
-                    'MarkerSize',this.YWhiskerMarkerSize,...
-                    'MarkerEdgeColor',this.YWhiskerMarkerEdgeColor,...
-                    'MarkerFaceColor',this.YWhiskerMarkerFaceColor);
-            end
-            %% XBar
-            try
-                %setup xbar handles
-                %% xbarlower
-                if isempty(this.XLowerBarHandles)||~any(ishghandle(this.XLowerBarHandles))
-                    try
-                        delete(this.XLowerBarHandles);
-                    catch
-                    end
-                    for n=1:numel(this.XData)
-                        this.XLowerBarHandles(n) = line(this.Parent,NaN,NaN);
-                    end
-                end
-                if numel(this.XLowerBarHandles)<numel(this.XData)
-                    for n=numel(this.XLowerBarHandles)+1:numel(this.XData)
-                        this.XLowerBarHandles(n) = line(this.Parent,NaN,NaN);
-                    end
-                end
-                if numel(this.XLowerBarHandles)<numel(this.XData)
-                    for n=numel(this.XData)+1:numel(this.XLowerBarHandles)
-                        delete(this.XLowerBarHandles(n));
-                    end
-                    this.XLowerBarHandles(numel(this.XData)+1:end) = [];
-                end
-                %% xbarupper
-                if isempty(this.XUpperBarHandles)||~any(ishghandle(this.XUpperBarHandles))
-                    try
-                        delete(this.XUpperBarHandles);
-                    catch
-                    end
-                    for n=1:numel(this.XData)
-                        this.XUpperBarHandles(n) = line(this.Parent,NaN,NaN);
-                    end
-                end
-                if numel(this.XUpperBarHandles)<numel(this.XData)
-                    for n=numel(this.XUpperBarHandles)+1:numel(this.XData)
-                        this.XUpperBarHandles(n) = line(this.Parent,NaN,NaN);
-                    end
-                end
-                if numel(this.XUpperBarHandles)<numel(this.XData)
-                    for n=numel(this.XData)+1:numel(this.XUpperBarHandles)
-                        delete(this.XUpperBarHandles(n));
-                    end
-                    this.XUpperBarHandles(numel(this.XData)+1:end) = [];
-                end
-                %% calc xbar height
-                orig_units = get(this.Parent,'units');
-                set(this.Parent,'units','points');
-                pos = plotboxpos(this.Parent);
-                set(this.Parent,'units',orig_units);
-                y_range = get(this.Parent,'ylim');
-                if strcmpi(this.Parent.YScale,'log') %log scale
-                    y_range = log10(y_range);
-                    height = this.XBarSize*(y_range(2)-y_range(1))/pos(4);
-
-                    for n=1:min(numel(this.XData),numel(this.XLowerData))
-                        set(this.XLowerBarHandles(n),'YData',10.^(log10(this.YData(n))+[-height/2,height/2]),'XData',(this.XData(n)-this.XLowerData(n))*[1,1]);
-                    end
-                    for n=1:min(numel(this.XData),numel(this.XUpperData))
-                        set(this.XUpperBarHandles(n),'YData',10.^(log10(this.YData(n))+[-height/2,height/2]),'XData',(this.XData(n)+this.XUpperData(n))*[1,1]);
-                    end
-
-                else %linear scale
-                    height = this.XBarSize*(y_range(2)-y_range(1))/pos(4);
-
-                    for n=1:min(numel(this.XData),numel(this.XLowerData))
-                        set(this.XLowerBarHandles(n),'YData',this.YData(n)+[-height/2,height/2],'XData',(this.XData(n)-this.XLowerData(n))*[1,1]);
-                    end
-                    for n=1:min(numel(this.XData),numel(this.XUpperData))
-                        set(this.XUpperBarHandles(n),'YData',this.YData(n)+[-height/2,height/2],'XData',(this.XData(n)+this.XUpperData(n))*[1,1]);
-                    end
-                end
-                %Set x bar line style
+            if numel(this.XLowerBarHandles)<numel(this.XData)
                 barcolor = this.XBarColor;
                 if strcmpi(barcolor,'auto')
                     barcolor = this.Color;
                 end
-                for n=1:numel(this.XLowerBarHandles)
+                for n=numel(this.XLowerBarHandles)+1:numel(this.XData)
+                    this.XLowerBarHandles(n) = line(this.Parent,NaN,NaN);
                     set(this.XLowerBarHandles(n),...
                         'LineStyle',this.XBarLineStyle,...
                         'LineWidth',this.XBarLineWidth,...
@@ -749,7 +538,94 @@ classdef errorbar2 < matlab.mixin.SetGet
                         'MarkerEdgeColor',this.XBarMarkerEdgeColor,...
                         'MarkerFaceColor',this.XBarMarkerFaceColor);
                 end
-                for n=1:numel(this.XUpperBarHandles)
+            end
+            if numel(this.XLowerBarHandles)>numel(this.XData)
+                delete(this.XLowerBarHandles(numel(this.XData)+1:end));
+                this.XLowerBarHandles(numel(this.XData)+1:end) = [];
+            end
+            %% calc xbar height, set data
+            orig_units = get(this.Parent,'units');
+            set(this.Parent,'units','points');
+            pos = plotboxpos(this.Parent);
+            set(this.Parent,'units',orig_units);
+            y_range = get(this.Parent,'ylim');
+            if strcmpi(this.Parent.YScale,'log') %log scale
+                y_range = log10(y_range);
+                height = this.XBarSize*(y_range(2)-y_range(1))/pos(4);
+                for n=1:min(numel(this.XData),numel(this.XLowerData))
+                    set(this.XLowerBarHandles(n),'YData',10.^(log10(this.YData(n))+[-height/2,height/2]),'XData',(this.XData(n)-this.XLowerData(n))*[1,1]);
+                end
+            else %linear scale
+                height = this.XBarSize*(y_range(2)-y_range(1))/pos(4);
+                for n=1:min(numel(this.XData),numel(this.XLowerData))
+                    set(this.XLowerBarHandles(n),'YData',this.YData(n)+[-height/2,height/2],'XData',(this.XData(n)-this.XLowerData(n))*[1,1]);
+                end
+            end
+        end
+        function replotdataXUpper(this)
+            if any(size(this.YData)~=size(this.XData))
+                return;
+            end
+            %% X Upper whisker
+            if isempty(this.XUpperLineHandles)||~any(ishghandle(this.XUpperLineHandles))
+                try
+                    delete(this.XUpperLineHandles);
+                catch
+                end
+                this.XUpperLineHandles = [];
+            end
+            if numel(this.XUpperLineHandles)<numel(this.XData)
+                whiskcolor = this.XWhiskerColor;
+                if strcmpi(whiskcolor,'auto')
+                    whiskcolor = this.Color;
+                end
+                for n=numel(this.XUpperLineHandles)+1:numel(this.XData)
+                    this.XUpperLineHandles(n) = line(this.Parent,NaN,NaN);
+                    set(this.XUpperLineHandles(n),...
+                        'LineStyle',this.XWhiskerLineStyle,...
+                        'LineWidth',this.XWhiskerLineWidth,...
+                        'Color',whiskcolor,...
+                        'Marker',this.XWhiskerMarker,...
+                        'MarkerSize',this.XWhiskerMarkerSize,...
+                        'MarkerEdgeColor',this.XWhiskerMarkerEdgeColor,...
+                        'MarkerFaceColor',this.XWhiskerMarkerFaceColor);
+                end
+            end
+            if numel(this.XUpperLineHandles)>numel(this.XData)
+                delete(this.XUpperLineHandles(numel(this.XData)+1:end));
+                this.XUpperLineHandles(numel(this.XData)+1:end) = [];
+            end
+            %set data for x whiskers
+            if ~isempty(this.XUpperData)
+                if numel(this.XUpperData)<numel(this.XData)
+                    this.XUpperData(end+1:numel(this.XData)) = NaN;
+                end
+                %set whisker data
+                for n=1:min(numel(this.XData),numel(this.YData))
+                    set(this.XUpperLineHandles(n),...
+                        'XData',this.XData(n)+[0,this.XUpperData(n)],...
+                        'YData',[this.YData(n),this.YData(n)]);
+                end
+            else %no x bounds, don't plot
+                for n=1:numel(this.XUpperLineHandles)
+                    set(this.XUpperLineHandles(n),'XData',NaN,'YData',NaN);
+                end
+            end
+            %% X Bar Low
+            if isempty(this.XUpperBarHandles)||~any(ishghandle(this.XUpperBarHandles))
+                try
+                    delete(this.XUpperBarHandles);
+                catch
+                end
+                this.XUpperBarHandles = [];
+            end
+            if numel(this.XUpperBarHandles)<numel(this.XData)
+                barcolor = this.XBarColor;
+                if strcmpi(barcolor,'auto')
+                    barcolor = this.Color;
+                end
+                for n=numel(this.XUpperBarHandles)+1:numel(this.XData)
+                    this.XUpperBarHandles(n) = line(this.Parent,NaN,NaN);
                     set(this.XUpperBarHandles(n),...
                         'LineStyle',this.XBarLineStyle,...
                         'LineWidth',this.XBarLineWidth,...
@@ -759,82 +635,94 @@ classdef errorbar2 < matlab.mixin.SetGet
                         'MarkerEdgeColor',this.XBarMarkerEdgeColor,...
                         'MarkerFaceColor',this.XBarMarkerFaceColor);
                 end
-            catch
-                'error making xbar'
             end
-            %% Y Bar
-            try
-                %% ybarlower
-                if isempty(this.YLowerBarHandles)||~any(ishghandle(this.YLowerBarHandles))
-                    try
-                        delete(this.YLowerBarHandles);
-                    catch
-                    end
-                    for n=1:numel(this.YData)
-                        this.YLowerBarHandles(n) = line(this.Parent,NaN,NaN);
-                    end
+            if numel(this.XUpperBarHandles)>numel(this.XData)
+                delete(this.XUpperBarHandles(numel(this.XData)+1:end));
+                this.XUpperBarHandles(numel(this.XData)+1:end) = [];
+            end
+            %% calc xbar height, set data
+            orig_units = get(this.Parent,'units');
+            set(this.Parent,'units','points');
+            pos = plotboxpos(this.Parent);
+            set(this.Parent,'units',orig_units);
+            y_range = get(this.Parent,'ylim');
+            if strcmpi(this.Parent.YScale,'log') %log scale
+                y_range = log10(y_range);
+                height = this.XBarSize*(y_range(2)-y_range(1))/pos(4);
+                for n=1:min(numel(this.XData),numel(this.XUpperData))
+                    set(this.XUpperHandles(n),'YData',10.^(log10(this.YData(n))+[-height/2,height/2]),'XData',(this.XData(n)+this.XUpperData(n))*[1,1]);
                 end
-                if numel(this.YLowerBarHandles)<numel(this.YData)
-                    for n=numel(this.YLowerBarHandles)+1:numel(this.YData)
-                        this.YLowerBarHandles(n) = line(this.Parent,NaN,NaN);
-                    end
+            else %linear scale
+                height = this.XBarSize*(y_range(2)-y_range(1))/pos(4);
+                for n=1:min(numel(this.XData),numel(this.XUpperData))
+                    set(this.XUpperBarHandles(n),'YData',this.YData(n)+[-height/2,height/2],'XData',(this.XData(n)+this.XUpperData(n))*[1,1]);
                 end
-                if numel(this.YLowerBarHandles)<numel(this.YData)
-                    for n=numel(this.YData)+1:numel(this.YLowerBarHandles)
-                        delete(this.YLowerBarHandles(n));
-                    end
-                    this.YLowerBarHandles(numel(this.YData)+1:end) = [];
+            end
+        end
+        function replotdataYLower(this)
+            if any(size(this.YData)~=size(this.XData))
+                return;
+            end
+            %% XLower
+            if isempty(this.YLowerLineHandles)||~any(ishghandle(this.YLowerLineHandles))
+                try
+                    delete(this.YLowerLineHandles);
+                catch
                 end
-                %% ybarupper
-                if isempty(this.YUpperBarHandles)||~any(ishghandle(this.YUpperBarHandles))
-                    try
-                        delete(this.YUpperBarHandles);
-                    catch
-                    end
-                    for n=1:numel(this.YData)
-                        this.YUpperBarHandles(n) = line(this.Parent,NaN,NaN);
-                    end
+                this.YLowerLineHandles = [];
+            end
+            if numel(this.YLowerLineHandles)<numel(this.YData)
+                whiskcolor = this.YWhiskerColor;
+                if strcmpi(whiskcolor,'auto')
+                    whiskcolor = this.Color;
                 end
-                if numel(this.YUpperBarHandles)<numel(this.YData)
-                    for n=numel(this.YUpperBarHandles)+1:numel(this.YData)
-                        this.YUpperBarHandles(n) = line(this.Parent,NaN,NaN);
-                    end
+                for n=numel(this.YLowerLineHandles)+1:numel(this.YData)
+                    this.YLowerLineHandles(n) = line(this.Parent,NaN,NaN);
+                    set(this.YLowerLineHandles(n),...
+                        'LineStyle',this.YWhiskerLineStyle,...
+                        'LineWidth',this.YWhiskerLineWidth,...
+                        'Color',whiskcolor,...
+                        'Marker',this.YWhiskerMarker,...
+                        'MarkerSize',this.YWhiskerMarkerSize,...
+                        'MarkerEdgeColor',this.YWhiskerMarkerEdgeColor,...
+                        'MarkerFaceColor',this.YWhiskerMarkerFaceColor);
                 end
-                if numel(this.YUpperBarHandles)<numel(this.YData)
-                    for n=numel(this.YData)+1:numel(this.YUpperBarHandles)
-                        delete(this.YUpperBarHandles(n));
-                    end
-                    this.YUpperBarHandles(numel(this.YData)+1:end) = [];
+            end
+            if numel(this.YLowerLineHandles)>numel(this.YData)
+                delete(this.YLowerLineHandles(numel(this.YData)+1:end));
+                this.YLowerLineHandles(numel(this.YData)+1:end) = [];
+            end
+            %set data for Y whiskers
+            if ~isempty(this.YLowerData)
+                if numel(this.YLowerData)<numel(this.YData)
+                    this.YLowerData(end+1:numel(this.YData)) = NaN;
                 end
-                %% set ybar data
-                x_range = get(this.Parent,'xlim');
-                if strcmpi(this.Parent.XScale,'log') %log scale
-                    x_range = log10(x_range);
-                    width = this.YBarSize*(x_range(2)-x_range(1))/pos(3);
-
-                    for n=1:min(numel(this.YData),numel(this.YLowerData))
-                        set(this.YLowerBarHandles(n),'XData',10.^(log10(this.XData(n))+[-width/2,width/2]),'YData',(this.YData(n)-this.YLowerData(n))*[1,1]);
-                    end
-                    for n=1:min(numel(this.YData),numel(this.YUpperData))
-                        set(this.YUpperBarHandles(n),'XData',10.^(log10(this.XData(n))+[-width/2,width/2]),'YData',(this.YData(n)+this.YUpperData(n))*[1,1]);
-                    end
-
-                else %linear scale
-                    width = this.YBarSize*(x_range(2)-x_range(1))/pos(3);
-
-                    for n=1:min(numel(this.YData),numel(this.YLowerData))
-                        set(this.YLowerBarHandles(n),'XData',this.XData(n)+[-width/2,width/2],'YData',(this.YData(n)-this.YLowerData(n))*[1,1]);
-                    end
-                    for n=1:min(numel(this.YData),numel(this.YUpperData))
-                        set(this.YUpperBarHandles(n),'XData',this.XData(n)+[-width/2,width/2],'YData',(this.YData(n)+this.YUpperData(n))*[1,1]);
-                    end
+                %set whisker data
+                for n=1:min(numel(this.YData),numel(this.XData))
+                    set(this.YLowerLineHandles(n),...
+                        'YData',this.YData(n)+[-this.YLowerData(n),0],...
+                        'XData',[this.XData(n),this.XData(n)]);
                 end
-                %% Set y bar line style
+            else %no Y bounds, don't plot
+                for n=1:numel(this.YLowerLineHandles)
+                    set(this.YLowerLineHandles(n),'XData',NaN,'YData',NaN);
+                end
+            end
+            %% Y Bar Low
+            if isempty(this.YLowerBarHandles)||~any(ishghandle(this.YLowerBarHandles))
+                try
+                    delete(this.YLowerBarHandles);
+                catch
+                end
+                this.YLowerBarHandles = [];
+            end
+            if numel(this.YLowerBarHandles)<numel(this.YData)
                 barcolor = this.YBarColor;
                 if strcmpi(barcolor,'auto')
                     barcolor = this.Color;
                 end
-                for n=1:numel(this.YLowerBarHandles)
+                for n=numel(this.YLowerBarHandles)+1:numel(this.YData)
+                    this.YLowerBarHandles(n) = line(this.Parent,NaN,NaN);
                     set(this.YLowerBarHandles(n),...
                         'LineStyle',this.YBarLineStyle,...
                         'LineWidth',this.YBarLineWidth,...
@@ -844,7 +732,94 @@ classdef errorbar2 < matlab.mixin.SetGet
                         'MarkerEdgeColor',this.YBarMarkerEdgeColor,...
                         'MarkerFaceColor',this.YBarMarkerFaceColor);
                 end
-                for n=1:numel(this.YUpperBarHandles)
+            end
+            if numel(this.YLowerBarHandles)>numel(this.YData)
+                delete(this.YLowerBarHandles(numel(this.YData)+1:end));
+                this.YLowerBarHandles(numel(this.YData)+1:end) = [];
+            end
+            %% calc Ybar height, set data
+            orig_units = get(this.Parent,'units');
+            set(this.Parent,'units','points');
+            pos = plotboxpos(this.Parent);
+            set(this.Parent,'units',orig_units);
+            x_range = get(this.Parent,'xlim');
+            if strcmpi(this.Parent.XScale,'log') %log scale
+                x_range = log10(x_range);
+                width = this.YBarSize*(x_range(2)-x_range(1))/pos(3);
+                for n=1:min(numel(this.YData),numel(this.YLowerData))
+                    set(this.YLowerBarHandles(n),'XData',10.^(log10(this.XData(n))+[-width/2,width/2]),'YData',(this.YData(n)-this.YLowerData(n))*[1,1]);
+                end
+            else %linear scale
+                width = this.YBarSize*(x_range(2)-x_range(1))/pos(3);
+                for n=1:min(numel(this.YData),numel(this.YLowerData))
+                    set(this.YLowerBarHandles(n),'XData',this.XData(n)+[-width/2,width/2],'YData',(this.YData(n)-this.YLowerData(n))*[1,1]);
+                end
+            end
+        end
+        function replotdataYUpper(this)
+            if any(size(this.YData)~=size(this.XData))
+                return;
+            end
+            %% Y upper whisker
+            if isempty(this.YUpperLineHandles)||~any(ishghandle(this.YUpperLineHandles))
+                try
+                    delete(this.YUpperLineHandles);
+                catch
+                end
+                this.YUpperLineHandles = [];
+            end
+            if numel(this.YUpperLineHandles)<numel(this.YData)
+                whiskcolor = this.YWhiskerColor;
+                if strcmpi(whiskcolor,'auto')
+                    whiskcolor = this.Color;
+                end
+                for n=numel(this.YUpperLineHandles)+1:numel(this.YData)
+                    this.YUpperLineHandles(n) = line(this.Parent,NaN,NaN);
+                    set(this.YUpperLineHandles(n),...
+                        'LineStyle',this.YWhiskerLineStyle,...
+                        'LineWidth',this.YWhiskerLineWidth,...
+                        'Color',whiskcolor,...
+                        'Marker',this.YWhiskerMarker,...
+                        'MarkerSize',this.YWhiskerMarkerSize,...
+                        'MarkerEdgeColor',this.YWhiskerMarkerEdgeColor,...
+                        'MarkerFaceColor',this.YWhiskerMarkerFaceColor);
+                end
+            end
+            if numel(this.YUpperLineHandles)>numel(this.YData)
+                delete(this.YUpperLineHandles(numel(this.YData)+1:end));
+                this.YUpperLineHandles(numel(this.YData)+1:end) = [];
+            end
+            %set data for Y whiskers
+            if ~isempty(this.YUpperData)
+                if numel(this.YUpperData)<numel(this.YData)
+                    this.YUpperData(end+1:numel(this.YData)) = NaN;
+                end
+                %set whisker data
+                for n=1:min(numel(this.YData),numel(this.XData))
+                    set(this.YUpperLineHandles(n),...
+                        'YData',this.YData(n)+[0,this.YUpperData(n)],...
+                        'XData',[this.XData(n),this.XData(n)]);
+                end
+            else %no Y bounds, don't plot
+                for n=1:numel(this.YUpperLineHandles)
+                    set(this.YUpperLineHandles(n),'XData',NaN,'YData',NaN);
+                end
+            end
+            %% Y Bar Upper
+            if isempty(this.YUpperBarHandles)||~any(ishghandle(this.YUpperBarHandles))
+                try
+                    delete(this.YUpperBarHandles);
+                catch
+                end
+                this.YUpperBarHandles = [];
+            end
+            if numel(this.YUpperBarHandles)<numel(this.YData)
+                barcolor = this.YBarColor;
+                if strcmpi(barcolor,'auto')
+                    barcolor = this.Color;
+                end
+                for n=numel(this.YUpperBarHandles)+1:numel(this.YData)
+                    this.YUpperBarHandles(n) = line(this.Parent,NaN,NaN);
                     set(this.YUpperBarHandles(n),...
                         'LineStyle',this.YBarLineStyle,...
                         'LineWidth',this.YBarLineWidth,...
@@ -854,9 +829,31 @@ classdef errorbar2 < matlab.mixin.SetGet
                         'MarkerEdgeColor',this.YBarMarkerEdgeColor,...
                         'MarkerFaceColor',this.YBarMarkerFaceColor);
                 end
-            catch
-                'error setting ybar'
             end
+            if numel(this.YUpperBarHandles)>numel(this.YData)
+                delete(this.YUpperBarHandles(numel(this.YData)+1:end));
+                this.YUpperBarHandles(numel(this.YData)+1:end) = [];
+            end
+            %% calc Ybar height, set data
+            orig_units = get(this.Parent,'units');
+            set(this.Parent,'units','points');
+            pos = plotboxpos(this.Parent);
+            set(this.Parent,'units',orig_units);
+            x_range = get(this.Parent,'xlim');
+            if strcmpi(this.Parent.XScale,'log') %log scale
+                x_range = log10(x_range);
+                width = this.YBarSize*(x_range(2)-x_range(1))/pos(3);
+                for n=1:min(numel(this.YData),numel(this.YUpperData))
+                    set(this.YUpperBarHandles(n),'XData',10.^(log10(this.XData(n))+[-width/2,width/2]),'YData',(this.YData(n)+this.YUpperData(n))*[1,1]);
+                end
+            else %linear scale
+                width = this.YBarSize*(x_range(2)-x_range(1))/pos(3);
+                for n=1:min(numel(this.YData),numel(this.YUpperData))
+                    set(this.YUpperBarHandles(n),'XData',this.XData(n)+[-width/2,width/2],'YData',(this.YData(n)+this.YUpperData(n))*[1,1]);
+                end
+            end
+        end
+        function resetChildren(this)
             %% make children array
             this.Children = [this.DataLineHandle,...
                                 this.XLowerLineHandles,...
@@ -1678,42 +1675,48 @@ classdef errorbar2 < matlab.mixin.SetGet
         function set.XData(this,val)
             this.XData = val;
             try
-                this.replotdata
+                this.replotdataXYonly;
+                this.resetChildren;
             catch
             end
         end
         function set.YData(this,val)
             this.YData = val;
             try
-                this.replotdata
+                this.replotdataXYonly;
+                this.resetChildren;
             catch
             end
         end
         function set.XLowerData(this,val)
             this.XLowerData = val;
             try
-                this.replotdata
+                this.replotdataXLower;
+                this.resetChildren;
             catch
             end
         end
         function set.XUpperData(this,val)
             this.XUpperData = val;
             try
-                this.replotdata
+                this.replotdataXUpper;
+                this.resetChildren;
             catch
             end
         end
         function set.YLowerData(this,val)
             this.YLowerData = val;
             try
-                this.replotdata
+                this.replotdataYLower;
+                this.resetChildren;
             catch
             end
         end
         function set.YUpperData(this,val)
             this.YUpperData = val;
             try
-                this.replotdata
+                this.replotdataYUpper;
+                this.resetChildren;
             catch
             end
         end

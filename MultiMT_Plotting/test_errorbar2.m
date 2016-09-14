@@ -1,7 +1,7 @@
 close all;
 clc;
 hAx = gca;
-h1 = errorbar2(hAx,1:10,1:10,.5*ones(1,10),.5*ones(1,10),2*ones(1,10),4*ones(1,10));
+h1 = errorbar2(hAx,1:10,1:10,.25*ones(1,10),.5*ones(1,10),2*ones(1,10),4*ones(1,10));
 hold on;
 h2 = errorbar2(hAx,(1:10)',(10:-1:1)','color',lines(1));
 
