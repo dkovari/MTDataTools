@@ -1,4 +1,4 @@
-function mtdatwriteheaderonly(file,header)
+function writeheaderonly(file,header)
 % Write Header to mtdat file
 % Inputs:
 %   file: Name (and path) of output file.
@@ -18,7 +18,7 @@ if fid==-1
 end
 
 %% Create YAML String
-yaml_str = YAML.dump(header);
+yaml_str = mtdat.YAML.dump(header);
 
 %% Write Header
 fprintf(fid,'%s\n','#!!#YAML_START');

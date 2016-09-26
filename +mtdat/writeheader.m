@@ -1,4 +1,4 @@
-function [fid,Record] = mtdatwriteheader(file,header,Record)
+function [fid,Record] = writeheader(file,header,Record)
 % Write Header to mtdat file
 % Inputs:
 %   file: Name (and path) of output file.
@@ -74,14 +74,14 @@ if ~isfield(Record,'encoding')
 end
 if ~isfield(Record,'formatsz')
     for rec = Record
-        rec.formatsz = fio_size(rec.format,rec.encoding);
+        rec.formatsz = mtdat.fio_size(rec.format,rec.encoding);
     end
 end
 
 header.Record = Record;
 
 %% Create YAML String
-yaml_str = YAML.dump(header);
+yaml_str = mtdat.YAML.dump(header);
 
 %% Write Header
 fprintf(fid,'%s\n','#!!#YAML_START');

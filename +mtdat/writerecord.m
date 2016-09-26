@@ -1,4 +1,4 @@
-function mtdat_writerecord(fid,RecordStruct,Record)
+function writerecord(fid,RecordStruct,Record)
 
 for n = 1:numel(RecordStruct)
     if ~isfield(Record,RecordStruct(n).parameter)

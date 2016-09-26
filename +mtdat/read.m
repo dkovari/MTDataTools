@@ -1,4 +1,4 @@
-function [header,data] = mtdatread(filename,varargin)
+function [header,data] = read(filename,varargin)
 %Load data from mtdat file.
 % Inputs:
 %   filename: name of file to read
@@ -82,7 +82,7 @@ while true
     yaml_str = [yaml_str,tline];
 end
 %% Convert YAML to struct
-header = YAML.load(yaml_str);
+header = mtdat.YAML.load(yaml_str);
 if p.Results.HeaderOnly
     data = [];
     return;
@@ -116,7 +116,7 @@ rec_count = 1;
 % Estimate Data length
 rec_bytes = 0;
 for rec = header.Record
-    sz = fio_size(rec.format,rec.encoding);
+    sz = mtdat.fio_size(rec.format,rec.encoding);
     if isnan(sz) %data type size is nan (prob a unicode/windows character)
         sz=4; %assume character is max unicode size (4bytes)
     end
@@ -124,29 +124,34 @@ for rec = header.Record
 end
 data_bytes = FileInfo.bytes-f_start;
 n_rec = ceil(data_bytes/rec_bytes);
-%pre-allocate data -- not sure if this is actually making things faster
-data(n_rec).(header.Record(1).parameter) = [];
-%disp(size(data));
 
-while fseek(fid,1,'cof')==0%try to advance to next byte to check for eof
-    fseek(fid,-1,'cof'); %rewind 1 byte
-    %deal with waitbar
-    if getappdata(hWB,'canceling')
-        warning('Canceled before reaching end of file');
-        break;
+if n_rec<1
+    warning('No records were found in file');
+else
+    %pre-allocate data -- not sure if this is actually making things faster
+    data(n_rec).(header.Record(1).parameter) = [];
+    %disp(size(data));
+
+    while fseek(fid,1,'cof')==0%try to advance to next byte to check for eof
+        fseek(fid,-1,'cof'); %rewind 1 byte
+        %deal with waitbar
+        if getappdata(hWB,'canceling')
+            warning('Canceled before reaching end of file');
+            break;
+        end
+        waitbar((ftell(fid)-f_start)/(data_bytes),hWB);
+        %Read each element of the record
+        for rec = header.Record
+           [data(rec_count).(rec.parameter), nRead] = fread(fid,rec.size,rec.format,rec.machinefmt);
+           if nRead ~= prod(rec.size)
+               warning('Could not read complete data for Record(%d).%s. File could be corrupted.',rec_count,rec.parameter);
+               break
+           end
+        end
+        rec_count = rec_count+1; 
     end
-    waitbar((ftell(fid)-f_start)/(data_bytes),hWB);
-    %Read each element of the record
-    for rec = header.Record
-       [data(rec_count).(rec.parameter), nRead] = fread(fid,rec.size,rec.format,rec.machinefmt);
-       if nRead ~= prod(rec.size)
-           warning('Could not read complete data for Record(%d).%s. File could be corrupted.',rec_count,rec.parameter);
-           break
-       end
-    end
-    rec_count = rec_count+1; 
+    %erase record elements that weren't read
+    data(rec_count:end) = [];
 end
-%erase record elements that weren't read
-data(rec_count:end) = [];
 delete(hWB);
 fclose(fid);

@@ -34,15 +34,17 @@ classdef YAML
     % See also: xmlread xmlwrite
     
     properties (Constant)
-        JARFILE = YAML.jarfile
+        JARFILE = mtdat.YAML.jarfile
     end
     
     methods (Static)
         function S  = jarfile()
+            import mtdat.YAML;
             %JARFILE path to the SnakeYAML jar file
             S = fullfile(fileparts(mfilename('fullpath')),'snakeyaml-1.9.jar');
         end
         function UpdateJavapath()
+            import mtdat.YAML;
             JavaInMem = javaclasspath('-all');
             PathIsLoaded = ~all(cellfun(@isempty,strfind(JavaInMem,YAML.JARFILE)));
 
@@ -54,6 +56,7 @@ classdef YAML
         end
         
         function [ X ] = load( S )
+            import mtdat.YAML;
             %LOAD load matlab object from yaml string
             YAML.UpdateJavapath();
             
@@ -66,6 +69,7 @@ classdef YAML
         end
         
         function [ S ] = dump( X )
+            import mtdat.YAML;
             %DUMP serialize matlab object into yaml string
             YAML.UpdateJavapath
             
@@ -78,6 +82,7 @@ classdef YAML
         end
         
         function [ X ] = read( filepath )
+            import mtdat.YAML;
             %READ read and decode yaml data from file
             fid = fopen(filepath,'r');
             S = fscanf(fid,'%c',inf);
@@ -86,6 +91,7 @@ classdef YAML
         end
         
         function [] = write( filepath, X )
+            import mtdat.YAML;
             %WRITE serialize and write yaml data to file
             S = YAML.dump( X );
             fid = fopen(filepath,'w');
@@ -96,6 +102,7 @@ classdef YAML
     
     methods(Static, Access=private)
         function result = load_data( r )
+            import mtdat.YAML;
             %LOAD_DATA recursively convert java objects
             if isa(r, 'char')
                 result = char(r);
@@ -127,6 +134,7 @@ classdef YAML
         end
         
         function result = merge_cell( r )
+            import mtdat.YAML;
             %MERGE_CELL convert cell array to native matrix
             
             % Check eligibility
@@ -154,6 +162,7 @@ classdef YAML
         end
         
         function result = dump_data( r )
+            import mtdat.YAML;
             %DUMP_DATA convert 
             if ischar(r)
                 result = java.lang.String(r);

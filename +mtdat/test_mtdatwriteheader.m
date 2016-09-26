@@ -57,9 +57,9 @@ xyz2.size = [1,4];
 
 Record = [d,h,xyz1,xyz2];
 
-fid = mtdatwriteheader(file,s,Record);
+fid = mtdat.writeheader(file,s,Record);
 fwrite(fid,ones(1000*10,1),'double');
 fclose(fid);
-[cfg,data] = mtdatread(file)
+[cfg,data] = mtdat.read(file)
 disp('data(1000) =');
 disp(data(1000));
