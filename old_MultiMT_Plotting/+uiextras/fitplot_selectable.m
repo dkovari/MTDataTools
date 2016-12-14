@@ -1,34 +1,61 @@
-function [hErr,hAx,hPnl,hFig] = ForceExtension_timeordered(L,F,Lerr,FerrLow,FerrUp,DataNames,hFig)
-%Generate plot of force vs length using the timeordered plot interface
-%   L = Tether length in um
-%       [L_trk1, Ltrk2,...]
-%   F = Force in pN
-%       [F_trk1, F_trk2, ...]
-%   Lerr = errorbar half-width for L
-%   FerrLow = Lower errorbar width for F (relative to F)
-%   FerrUp = upper errorbar width for F (relative to F)
-% Optional
-%   hFig: specify figure
+function [hErr,hAx,hPnl,hFig] = fitplot_selectable(X,Y,varargin)
+
 
 import uiextras.*
+%% parse inputs
+p = inputParser;
+p.CaseSensitive = false;
+%p.KeepUnmatched = true;
 
-if nargin<7
-    hFig = [];
-end
+addParameter(p,'Xlower',[]);
+addParameter(p,'Xupper',[]);
+addParameter(p,'Ylower',[]);
+addParameter(p,'Yupper',[]);
 
-[hErr,hAx,hPnl,hFig] = plot_timeordered(...
-    L,...
-    F,...
-    Lerr,Lerr,...
-    FerrLow,FerrUp,DataNames,hFig);
+addParameter(p,'FigureHandle',[]);
+addParameter(p,'DataNames',[]);
 
-hAx.Title.String = 'Force vs Length';
-xlabel(hAx,'Avg. Tether Length [µm]');
-ylabel(hAx,'Force [pN]');
-set(hAx,'yscale','log');
+addParameter(p,'FitType',[]);
+addParameter(p,'FitParameters',{}); %cell array of name,value pairs to pass to fit
+addParameter(p,'FitLHS',[],@(x) isempty(x)||isa(x,'function_handle'));
+addParameter(p,'FitLHSinv',[],@(x) isempty(x)||isa(x,'function_handle'));
+
+addParameter(p,'FitStringGenerator',@defaultStrGen,@(x) isa(x,'function_handle'));
+
+parse(p,varargin{:});
+
+
+%Save unmatched in a simple cell array which we will pass to set the axis
+%properties
+%UnMatchedParams = {reshape(fieldnames(p.Unmatched),1,[]);reshape(struct2cell(p.Unmatched),1,[])};
+p = p.Results;
+
+%% Make plot
+[hErr,hAx,hPnl,hFig] = errorbar_selectable(...
+    X,...
+    Y,...
+    p.Xlower,p.Xupper,...
+    p.Ylower,p.Yupper,p.DataNames,p.FigureHandle);
+
+%set appdata for fitting system
+setappdata(hAx,'FitType',p.FitType);
+setappdata(hAx,'FitParameters',p.FitParameters);
+setappdata(hAx,'FitLHS',p.FitLHS);
+setappdata(hAx,'FitLHSinv',p.FitLHSinv);
+setappdata(hAx,'FitStringGenerator',p.FitStringGenerator);
 
 %% Setup Fitting Menu
-num_tracks = size(L,2);
+if iscell(X)
+    num_tracks = numel(X);
+else
+    num_tracks = size(X,2);
+end
+
+if numel(p.DataNames)<num_tracks
+    for n=numel(p.DataNames)+1:num_tracks
+        p.DataNames{n} = sprintf('Data %d',n);
+    end
+end
 
 hFitMenu = uimenu(hFig,'Label','Fit Data');
 hShowFit = uimenu(hFitMenu,'Label','Show Fit');
@@ -42,23 +69,23 @@ for n=1:num_tracks
 end
 for t=1:num_tracks
     % show fit
-    uimenu(hShowFit,'Label',DataNames{t},...
+    uimenu(hShowFit,'Label',p.DataNames{t},...
         'Checked','off',...
         'Interruptible','off',...
         'Callback', @(h,e) ShowFit(h,e,hAx,hErr(t),hFitLines(t)));
     
     % Exclude Data
-    uimenu(hExclude,'Label',DataNames{t},...
+    uimenu(hExclude,'Label',p.DataNames{t},...
         'Interruptible','off',...
         'Callback', @(h,e) ExcludeData(h,e,hAx,hErr(t),hFitLines(t)));
     
     % Include Data
-    uimenu(hInclude,'Label',DataNames{t},...
+    uimenu(hInclude,'Label',p.DataNames{t},...
         'Interruptible','off',...
         'Callback', @(h,e) IncludeData(h,e,hAx,hErr(t),hFitLines(t)));
     
     % reset data
-    uimenu(hReset,'Label',DataNames{t},...
+    uimenu(hReset,'Label',p.DataNames{t},...
         'Interruptible','off',...
         'Callback', @(h,e) ResetData(h,e,hAx,hErr(t),hFitLines(t)));
     
@@ -108,18 +135,42 @@ else
     ExcludeIdx = getappdata(hFitLine,'ExcludeIdx');
 end
 
+if ~isappdata(hAx,'FitType')
+    return;
+end
+
 %calc fit
-L = hEb.XData;
-F = hEb.YData;
-L(ExcludeIdx) = [];
-F(ExcludeIdx) = [];
-[Lo,P,LoCI, PCI, ~] = FitWLC(L,F);
+X = hEb.XData;
+Y = hEb.YData;
+X(ExcludeIdx) = [];
+Y(ExcludeIdx) = [];
+
+FT = getappdata(hAx,'FitType');
+FO = getappdata(hAx,'FitParameters');
+FLHS = getappdata(hAx,'FitLHS');
+FLHSinv = getappdata(hAx,'FitLHSinv');
+StrGen = getappdata(hAx,'FitStringGenerator');
+
+if isempty(FT)
+    return;
+end
+
+if isa(FLHS,'function_handle')
+    Y = FLHS(Y);
+end
+
+fitobj = fit(X,Y,FT,FO{:});
 
 %update plot
 xl = hAx.XLim;
 yl = hAx.YLim;
-x = linspace(0,Lo,30);
-y = Fwlc(Lo,P,x);
+x = linspace(min(min(X),xl(1)),max(max(X),xl(2)),100);
+y = fitobj(x);
+
+if isa(FLHSinv,'function_handle')
+    y = FLHSinv(y);
+end
+
 set(hFitLine,'XData',x,'YData',y)
 hAx.YLim = yl;
 hAx.XLim = xl;
@@ -127,7 +178,7 @@ hAx.XLim = xl;
 %update legend
 hLeg = findobj(hAx.Parent,'Type','legend');
 if ~isempty(hLeg)
-    hFitLine.DisplayName = sprintf('L_0=%0.2f[%0.2f,%0.2f]µm L_p=%0.1f[%0.1f,%0.1f]nm',Lo,LoCI(1),LoCI(2),P,PCI(1),PCI(2));
+    hFitLine.DisplayName = StrGen(fitobj);
     if ~any(hLeg.PlotChildren==hFitLine)
         hLeg.PlotChildren = [reshape(hLeg.PlotChildren,1,[]),reshape(hFitLine,1,[])];
     end
@@ -144,6 +195,20 @@ else
         hExcLine = line(hAx,hEb.XData(ExcludeIdx),hEb.YData(ExcludeIdx),'Marker','x','color','r','MarkerSize',12,'LineStyle','none');
     end
     setappdata(hFitLine,'hExcLine',hExcLine);
+end
+
+function S = defaultStrGen(fitobj)
+%default fit string generator
+% output:
+%   v1:###[###,###]\n
+%   v2:###[###,###]\n
+%    ...
+names = coeffnames(fitobj);
+vals = coeffvalues(fitobj);
+CI = confint(fitobj);
+S = [];
+for n=1:numel(names)
+    S = [S,sprintf('%s:%g[%g,%g]\n',names{n},vals(n),CI(:,n))];
 end
 
 function ExcludeData(~, ~, hAx, hEb, hFitLine)
@@ -208,45 +273,3 @@ ExcludeIdx = [];
 setappdata(hFitLine,'ExcludeIdx',ExcludeIdx);
 
 UpdateFit(hAx,hEb,hFitLine);
-
-function [Lo,P,LoCI, PCI, fo] = FitWLC(L,Fx)
-import uiextras.*
-%Fit Fx vs L to WLC model
-% Fx: pN
-% L: same units as Lo (um a good choice)
-% Lo = contour length (units of L)
-% P = persistence length in nm
-% fo = fitobject
-
-ft = fittype('log10(4.11/P*(1/4*(1-x/Lo)^(-2)-1/4+x/Lo))');
-%ft = fittype( @(Lo,P,x) log10( 4.11./P.*(1/4*(1- lessthan1(x./Lo) ).^(-2)-1/4+lessthan1(x./Lo)) ));
-
-Fx(isnan(L)) = [];
-L(isnan(L)) = [];
-L(isnan(Fx)) = [];
-Fx(isnan(Fx)) = [];
-
-if isempty(L)
-    Lo = NaN;
-    P = NaN;
-    LoCI = [NaN,NaN];
-    PCI = [NaN,NaN];
-    fo = [];
-end
-
-fo = fit(L,log10(Fx),ft,...
-        'StartPoint',[100,1],...
-        'Lower',[0,0],...
-        'Upper',[Inf,Inf]);
-
-coef = coeffvalues(fo);
-coefint = confint(fo);
-Lo = coef(1);
-P = coef(2);
-LoCI = coefint(:,1);
-PCI = coefint(:,2);
-
-function F = Fwlc(Lo,P,x)
-x(x>=Lo) = NaN;
-x(x<=0) = NaN;
-F = 4.11./P.*(1/4*(1-x./Lo).^(-2)-1/4+x./Lo);

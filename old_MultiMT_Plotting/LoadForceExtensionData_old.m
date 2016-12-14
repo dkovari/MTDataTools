@@ -139,6 +139,9 @@ FxUpper95 = NaN(nT,num_tracks);
 Lext = NaN(nT,num_tracks);
 LextStdErr = NaN(nT,num_tracks);
 Xvar = NaN(nT,num_tracks);
+Zvar = NaN(nT,num_tracks);
+ZvarLower95 = NaN(nT,num_tracks);
+ZvarUpper95 = NaN(nT,num_tracks);
 for t=1:nT
     
     if t==nT
@@ -151,35 +154,40 @@ for t=1:nT
     thisY = PxScale*Y( Time>=DateNum(t)&Time<nextT, MeasuredTracks);
     thisdZ = dZ( TimeZ>=DateNum(t)&TimeZ<nextT, MeasuredTracks);
     
-    L = sqrt( ...
-            bsxfun(@minus,thisX,nanmean(thisX,1)).^2 + ...
-            bsxfun(@minus,thisY,nanmean(thisY,1)).^2 + ...
-            thisdZ.^2 );
+    thisZ = Z_abs( TimeZ>=DateNum(t)&TimeZ<nextT, MeasuredTracks);
+    for id=1:size(thisZ,2)
+        if all(isnan(thisZ(:,id)))
+            thisZ(:,id) = Z_rel( TimeZ>=DateNum(t)&TimeZ<nextT, MeasuredTracks(id));
+        end
+    end
+%     L = sqrt( ...
+%             bsxfun(@minus,thisX,nanmean(thisX,1)).^2 + ...
+%             bsxfun(@minus,thisY,nanmean(thisY,1)).^2 + ...
+%             thisdZ.^2 );
+    L = thisdZ;
     Lext(t,MeasuredTracks) = nanmean(L,1);
-    LextStdErr(t,MeasuredTracks) = nanstd(L,0,1)/sqrt(numel(thisX));
+    LextStdErr(t,MeasuredTracks) = nanstd(L,0,1)/sqrt(numel(L));
     
     varX = var(thisX,0,1,'omitnan');
     Fx(t,MeasuredTracks) = kBT*Lext(t,MeasuredTracks)./varX*10^6;
     
+    nx = sum(~isnan(thisX),1);
     FxLower95(t,MeasuredTracks) = ...
         kBT*10^6*...
-        (Lext(t,MeasuredTracks)-2*LextStdErr(t,MeasuredTracks))./ ((numel(thisX)-1)*varX/chi2inv(0.05/2,(numel(thisX)-1)));
+        (Lext(t,MeasuredTracks)-2*LextStdErr(t,MeasuredTracks))./ ((nx-1).*varX./chi2inv(0.05/2,(nx-1)));
     FxUpper95(t,MeasuredTracks) = ...
         kBT*10^6*...
-        (Lext(t,MeasuredTracks)+2*LextStdErr(t,MeasuredTracks))./ ((numel(thisX)-1)*varX/chi2inv(1-(.05/2),(numel(thisX)-1)));
+        (Lext(t,MeasuredTracks)+2*LextStdErr(t,MeasuredTracks))./ ((nx-1).*varX./chi2inv(1-(.05/2),(nx-1)));
     
     
     Xvar(t,MeasuredTracks) = varX/(PxScale.^2);
+    
+    Zvar(t,MeasuredTracks) = var(thisZ,0,1,'omitnan');
+    nz = sum(~isnan(thisZ),1);
+    ZvarLower95(t,MeasuredTracks) = (nz-1).*Zvar(t,MeasuredTracks)./chi2inv(0.05/2,(nz-1));
+    ZvarUpper95(t,MeasuredTracks) = (nz-1).*Zvar(t,MeasuredTracks)./chi2inv(1-0.05/2,(nz-1));
+        
 end
-
-
-
-
-%% Export Data
-uiextras.putvar(Data,MagH,DateVec,MeasuredTracks);
-uiextras.putvar(Time,X,Y,TimeZ,Z_rel,Z_abs,dZ,num_tracks,refID,PxScale,FxLower95,FxUpper95,LextStdErr);
-
-uiextras.putvar(Fx,Lext,Xvar);
 
 %% Plot Raw Data
 
@@ -287,4 +295,35 @@ title(hAx,'sqrt(Xvar) vs L');
 set(hFig,'NumberTitle','off',...
          'Name',[name,':Xvar']);
                     
+%% Force Est from var(Z)
+% from te Velthuis et al (2010)
+% kz=kbT/(2*Lp*Lo)*(2+(1-Z/Lo)^-3)
+%from equipartition for H.O.
+%  kz = kbT/var(z)
 
+[~,hAx,~,hFig] = uiextras.fitplot_selectable(...
+                            Lext,...
+                            Zvar,...
+                            'Ylower',Zvar-ZvarLower95,...
+                            'Yupper',ZvarUpper95- Zvar,...
+                            'FitType',fittype('2*P*Lo*(2+(1-x/Lo)^-3)^-1'),...
+                            'FitParameters',...
+                                    {'StartPoint',[100,1],...
+                                     'Lower',[0,0],...
+                                     'Upper',[Inf,Inf]});
+xlabel(hAx,'Extension [µm]');
+ylabel(hAx,'var(Z) [µm^2]');
+title(hAx,'Var(Z) vs L');
+set(hFig,'NumberTitle','off',...
+         'Name',[name,':Zvar']);
+%set(hAx,'yscale','log');
+
+
+%% Put vars?
+btn = questdlg('Do you want to export variables to the workspace?','Putvars?','yes','no','yes');
+if strcmpi(btn,'yes')
+    %% Export Data
+    uiextras.putvar(Data,MagH,DateVec,MeasuredTracks);
+    uiextras.putvar(Time,X,Y,TimeZ,Z_rel,Z_abs,dZ,num_tracks,refID,PxScale,FxLower95,FxUpper95,LextStdErr);
+    uiextras.putvar(Fx,Lext,Xvar);
+end

@@ -18,7 +18,6 @@ if nargin< 1
 end
 
 %% load data
-opath = addpath(fullfile(fileparts(mfilename('fullpath')),'mtdat_fileio'));
 [header,data] = mtdat.read(filepath);
 
 
@@ -88,11 +87,7 @@ end
 
 %% Return Output
 if nargout<1
-    putvar(header,ExperimentData);
+    uiextras.putvar(header,ExperimentData);
     clear header;
     clear ExperimentData;
 end
-
-path(opath);
-
-

@@ -25,5 +25,5 @@ varX = 4.11*x*1000./F;
 figure;
 plot(x,sqrt(varX)/(PxScale*1000));
 xlabel('Extension (µm)')
-ylabel('sqrt(var(x)) [px^2]');
+ylabel('sqrt(var(x)) [px]');
 
